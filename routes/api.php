@@ -6,6 +6,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\RoomImageController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\RoleController;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -40,6 +42,27 @@ Route::middleware('auth.jwt')->group(function () {
         Route::delete('{id}', [UserController::class, 'destroy']);
     });
 
+    // Roles
+    Route::prefix('roles')->group(function () {
+        Route::get('/',       [RoleController::class, 'index']);
+        Route::post('/',      [RoleController::class, 'store']);
+        Route::get('{id}',    [RoleController::class, 'show']);
+        Route::put('{id}',    [RoleController::class, 'update']);
+        Route::delete('{id}', [RoleController::class, 'destroy']);
+        Route::prefix('{id}/role-permissions')->group(function () {
+            Route::put('/',    [RoleController::class, 'updatePermissions']);
+        });
+    });
+
+    // Permissions
+    Route::prefix('permissions')->group(function () {
+        Route::get('/',       [PermissionController::class, 'index']);
+        Route::post('/',      [PermissionController::class, 'store']);
+        Route::get('{id}',    [PermissionController::class, 'show']);
+        Route::put('{id}',    [PermissionController::class, 'update']);
+        Route::delete('{id}', [PermissionController::class, 'destroy']);
+    });
+
     // Rooms
     Route::prefix('rooms')->group(function () {
         Route::get('/',       [RoomController::class, 'index']);
@@ -56,6 +79,8 @@ Route::middleware('auth.jwt')->group(function () {
             Route::put('{image_id}/set-main', [RoomController::class, 'setMainImage']);
         });
     });
+
+    // Bookings
     Route::prefix('bookings')->group(function () {
         Route::get('/',       [BookingController::class, 'index']);
         Route::post('/',      [BookingController::class, 'store']);

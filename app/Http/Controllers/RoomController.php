@@ -24,7 +24,8 @@ class RoomController extends Controller
 
 
         $rooms = DB::table('rooms')
-            ->select('id', 'name', 'capacity', 'description', 'created_at')
+            ->leftJoin('users as pic', 'rooms.pic_id', '=', 'pic.id')
+            ->select('rooms.id', 'rooms.name', 'rooms.capacity', 'rooms.description', 'pic.name as pic_name', 'rooms.created_at')
             ->orderByDesc('created_at')
             ->paginate($limit, ['*'], 'page', $page);
 
@@ -192,7 +193,7 @@ class RoomController extends Controller
                     $image = base64_decode($image);
                     $extension = strtolower($type[1]); // jpg, png, gif, etc.
                     $date = Carbon::now()->format('Y-m-d');
-                    $filename = 'room_image_' . Auth::id() . '_' . $date . '.' . $extension;
+                    $filename = 'room_image_' . Auth::id() . '_' . uniqid() . '_' . $date . '.' . $extension;
                     $path = storage_path('app/public/room_images/' . $filename);
                     file_put_contents($path, $image);
 

@@ -45,9 +45,27 @@ class AuthController extends Controller
 
         // Cek user berdasarkan email
         $user = DB::table('users')
-            ->select('id', 'email', 'role', 'password')
+            ->select('id', 'email', 'role_id', 'password')
             ->where('email', $email)
             ->first();
+        $role = DB::table('roles')
+            ->where('id', $user->role_id)
+            ->select('id', 'name')
+            ->first();
+        $permissions = DB::table('permissions')
+            ->join('permission_role', 'permissions.id', '=', 'permission_role.permission_id')
+            ->where('permission_role.role_id', $user->role_id)
+            ->pluck('permissions.slug');
+
+        if ($role) {
+            $user->role = $role;
+            $user->permissions = $permissions;
+        } else {
+            $user->role = null;
+            $user->permissions = [];
+        }
+
+        // Cek apakah user ditemukan
 
         if (!$user) {
             return $this->formatResponse(401, 'Unauthorized: NIP tidak ditemukan', null);
@@ -67,7 +85,7 @@ class AuthController extends Controller
             'exp'  => $expiration,
             'id'  => $user->id,
             'email' => $user->email,
-            'role'  => $user->role,
+            'role'  => $role->name,
         ];
 
         $secretKey = env('JWT_SECRET');
@@ -86,6 +104,20 @@ class AuthController extends Controller
     public function me()
     {
         $data =  Auth::user();
+        $role = DB::table('roles')
+            ->where('id', $data->role_id)
+            ->select('id', 'name', 'description')
+            ->first();
+        $data->role = $role->name ?? 'User';
+        $data->role_id = $role->id ?? null;
+
+        $permissions = DB::table('permissions')
+            ->select('permissions.id', 'permissions.name', 'permissions.slug', 'permissions.type')
+            ->join('permission_role', 'permissions.id', '=', 'permission_role.permission_id')
+            ->where('permission_role.role_id', $data->role_id)
+            ->get();
+        $data->permissions = $permissions;
+
         return $this->formatResponse(200, 'success', $data);
     }
 
