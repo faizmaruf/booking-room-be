@@ -25,10 +25,21 @@ class RoleController extends Controller
             ->select('id', 'name', 'description', 'created_at')
             ->orderBy('created_at', 'desc')
             ->paginate($limit, ['*'], 'page', $page);
+        $roleIds = $data->pluck('id')->toArray();
 
+        $permissions = DB::table('permissions')
+            ->join('permission_role', 'permissions.id', '=', 'permission_role.permission_id')
+            ->whereIn('permission_role.role_id', $roleIds)
+            ->select('permissions.id', 'permissions.name', 'permissions.slug', 'permissions.type', 'permission_role.role_id')
+            ->get()
+            ->groupBy('role_id');
+
+        foreach ($data as $role) {
+            $role->permissions = isset($permissions[$role->id]) ? $permissions[$role->id] : [];
+        }
+        // $permissions = DB::table('permissions')
         return $this->formatResponse(200, 'success', $data);
     }
-
 
     public function store(Request $request)
     {

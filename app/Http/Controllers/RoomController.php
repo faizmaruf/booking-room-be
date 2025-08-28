@@ -25,7 +25,7 @@ class RoomController extends Controller
 
         $rooms = DB::table('rooms')
             ->leftJoin('users as pic', 'rooms.pic_id', '=', 'pic.id')
-            ->select('rooms.id', 'rooms.name', 'rooms.capacity', 'rooms.description', 'pic.name as pic_name', 'rooms.created_at')
+            ->select('rooms.id', 'rooms.name', 'rooms.capacity', 'rooms.description', 'pic.id as pic_id', 'pic.name as pic_name', 'rooms.created_at')
             ->orderByDesc('created_at')
             ->paginate($limit, ['*'], 'page', $page);
 

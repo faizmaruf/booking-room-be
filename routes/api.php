@@ -8,6 +8,7 @@ use App\Http\Controllers\RoomImageController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\WorkUnitController;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -96,4 +97,10 @@ Route::middleware('auth.jwt')->group(function () {
         Route::delete('{id}',     [RoomImageController::class, 'destroy']);
         Route::put('{id}/main',   [RoomImageController::class, 'setMain']);
     });
+
+    Route::get('work-units', [WorkUnitController::class, 'index']);
+    Route::post('work-units', [WorkUnitController::class, 'store']);
+    Route::get('work-units/{id}', [WorkUnitController::class, 'show']);
+    Route::put('work-units/{id}', [WorkUnitController::class, 'update']);
+    Route::delete('work-units/{id}', [WorkUnitController::class, 'destroy']);
 });

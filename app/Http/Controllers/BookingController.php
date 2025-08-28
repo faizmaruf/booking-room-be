@@ -23,10 +23,29 @@ class BookingController extends Controller
         $limit = request()->input('limit', 10);
         $page  = request()->input('page', 1);
         $user_id = request()->input('user_id');
+        $query = DB::table('bookings as b')
+            ->select(
+                'b.*',
+                'r.name as room_name',
+                'ri.image_path as room_image',
+                'u.name as user_name',
+                'w.name as work_unit_name',
+                'rejected_users.name as rejected_by_name',
+                'approved_users.name as approved_by_name',
+                'cancelled_users.name as cancelled_by_name'
+            )
+            ->join('rooms as r', 'b.room_id', '=', 'r.id')
+            ->leftJoin('users as u', 'b.user_id', '=', 'u.id')
+            ->leftJoin('work_units as w', 'u.work_unit_id', '=', 'w.id')
+            ->leftJoin('room_images as ri', function ($join) {
+                $join->on('r.id', '=', 'ri.room_id')
+                    ->where('ri.is_main', 1);
+            })
+            ->leftJoin('users as rejected_users', 'b.rejected_by', '=', 'rejected_users.id')
+            ->leftJoin('users as approved_users', 'b.approved_by', '=', 'approved_users.id')
+            ->leftJoin('users as cancelled_users', 'b.deleted_by', '=', 'cancelled_users.id')
+            ->orderBy('b.created_at', 'desc');
 
-        $query = DB::table('bookings')
-            ->select('id', 'user_id', 'room_id', 'booking_date', 'start_time', 'end_time', 'status', 'created_at')
-            ->orderBy('created_at', 'desc');
 
         if ($user_id) {
             $query->where('user_id', $user_id);
@@ -35,24 +54,24 @@ class BookingController extends Controller
         return $this->formatResponse(200, 'success', $data);
     }
 
-
     public function store(Request $request)
     {
         DB::beginTransaction();
         try {
-            // dd($request->all());
             $validator = Validator::make($request->all(), [
-                'user_id'    => 'required',
+
                 'room_id'    => 'required',
                 'booking_date' => 'required',
                 'start_time' => 'required',
                 'end_time'   => 'required|after:start_time',
+                'purpose'    => 'nullable|string',
             ], [
-                'user_id.required'    => 'User ID wajib diisi.',
+
                 'room_id.required'    => 'Room ID wajib diisi.',
                 'booking_date.required' => 'Booking date wajib diisi.',
                 'start_time.required' => 'Start time wajib diisi.',
                 'end_time.required'   => 'End time wajib diisi.',
+                'end_time.after'      => 'End time harus setelah start time.',
             ]);
 
             if ($validator->fails()) {
@@ -60,11 +79,30 @@ class BookingController extends Controller
                 return $this->formatResponse(422, $errorMessages, null);
             }
 
+            // jika ada booking di hari dan jam dan room id nya sama, tolak
+            $existingBooking = DB::table('bookings')
+                ->where('room_id', $request->room_id)
+                ->where('booking_date', $request->booking_date)
+                ->where(function ($query) use ($request) {
+                    $query->whereBetween('start_time', [$request->start_time, $request->end_time])
+                        ->orWhereBetween('end_time', [$request->start_time, $request->end_time])
+                        ->orWhere(function ($q) use ($request) {
+                            $q->where('start_time', '<=', $request->start_time)
+                                ->where('end_time', '>=', $request->end_time);
+                        });
+                })
+                ->whereNull('deleted_at')
+                ->first();
+            if ($existingBooking) {
+                return $this->formatResponse(409, 'Ruangan sudah terisi pada waktu tersebut', null);
+            }
+
             $booking = DB::table('bookings')->insert([
                 'user_id'    => Auth::id(),
                 'room_id'    => $request->room_id,
                 'booking_date' => $request->booking_date ?? now()->toDateString(),
                 'start_time' => $request->start_time,
+                'purpose'    => $request->purpose,
                 'end_time'   => $request->end_time,
                 'status'     => 'pending', // Default status
                 'created_at' => Carbon::now(),
@@ -98,13 +136,13 @@ class BookingController extends Controller
         DB::beginTransaction();
         try {
             $validator = Validator::make($request->all(), [
-                'user_id'    => 'required',
+
                 'room_id'    => 'required',
                 'booking_date' => 'required',
                 'start_time' => 'required',
                 'end_time'   => 'required|after:start_time',
             ], [
-                'user_id.required'    => 'User ID wajib diisi.',
+
                 'room_id.required'    => 'Room ID wajib diisi.',
                 'booking_date.required' => 'Booking date wajib diisi.',
                 'start_time.required' => 'Start time wajib diisi.',
@@ -117,11 +155,12 @@ class BookingController extends Controller
             }
 
             $booking = DB::table('bookings')->where('id', $id)->update([
-                'user_id'    => $request->user_id,
+                'user_id'    => Auth::id(),
                 'room_id'    => $request->room_id,
                 'booking_date' => $request->booking_date,
                 'start_time' => $request->start_time,
                 'end_time'   => $request->end_time,
+                'purpose'    => $request->purpose,
                 'status'     => $request->status ?? 'pending',
                 'updated_at' => Carbon::now(),
                 'updated_by' => Auth::id(),
@@ -147,7 +186,20 @@ class BookingController extends Controller
                 return $this->formatResponse(404, 'Booking not found', null);
             }
 
-            DB::table('bookings')->where('id', $id)->delete();
+            DB::table('bookings')->where('id', $id)->update([
+                'deleted_at' => Carbon::now(),
+                'deleted_by' => Auth::id(),
+                'status' => 'cancelled', // Assuming you want to mark it as cancelled
+                'cancelled_at' => Carbon::now(),
+                'cancelled_by' => Auth::id(),
+                'approved_at' => null,
+                'approved_by' => null,
+                'rejected_at' => null,
+                'rejected_by' => null,
+                'rejected_reason' => null,
+            ]);
+
+
 
             DB::commit();
 
@@ -158,6 +210,7 @@ class BookingController extends Controller
             return $this->formatResponse(500, 'Internal Server Error', null);
         }
     }
+
     public function approve(string $id)
     {
         DB::beginTransaction();
@@ -172,6 +225,13 @@ class BookingController extends Controller
                 'status' => 'approved',
                 'updated_at' => Carbon::now(),
                 'updated_by' => Auth::id(),
+                'approved_at' => Carbon::now(),
+                'approved_by' => Auth::id(),
+                'rejected_at' => null,
+                'rejected_by' => null,
+                'rejected_reason' => null,
+                'deleted_at' => null,
+                'deleted_by' => null
             ]);
 
             DB::commit();
@@ -184,10 +244,21 @@ class BookingController extends Controller
         }
     }
 
-    public function reject(string $id)
+    public function reject(Request $request, string $id)
     {
         DB::beginTransaction();
         try {
+            $validator = Validator::make($request->all(), [
+                'reason'    => 'required',
+            ], [
+                'reason.required'    => 'Alasan reject wajib diisi.',
+            ]);
+
+            if ($validator->fails()) {
+                $errorMessages = collect($validator->errors()->all())->implode(', ');
+                return $this->formatResponse(422, $errorMessages, null);
+            }
+
             $booking = DB::table('bookings')->where('id', $id)->first();
 
             if (!$booking) {
@@ -196,8 +267,15 @@ class BookingController extends Controller
 
             DB::table('bookings')->where('id', $id)->update([
                 'status' => 'rejected',
-                'updated_at' => Carbon::now(),
-                'updated_by' => Auth::id(),
+                'updated_at' => null,
+                'rejected_at' => Carbon::now(),
+                'rejected_by' => Auth::id(),
+                'rejected_reason' => $request->reason, // Optional reason for rejection
+                'approved_at' => null,
+                'approved_by' => null,
+                'deleted_at' => null,
+                'deleted_by' => null,
+
             ]);
 
             DB::commit();

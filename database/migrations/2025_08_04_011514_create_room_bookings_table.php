@@ -25,6 +25,12 @@ return new class extends Migration
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->unsignedBigInteger('deleted_by')->nullable();
+            $table->unsignedBigInteger('approved_by')->nullable();
+            $table->unsignedBigInteger('rejected_by')->nullable();
+            $table->string('rejected_reason')->nullable();
+
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('rejected_at')->nullable();
 
             $table->timestamps();
             $table->softDeletes();
