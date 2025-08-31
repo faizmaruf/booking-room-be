@@ -22,6 +22,9 @@ Route::post('login',  [AuthController::class, 'login']);
 Route::post('logout', [AuthController::class, 'logout']);
 Route::post('register', [AuthController::class, 'register']); // optional
 
+Route::prefix('rooms')->group(function () {
+    Route::get('/',       [RoomController::class, 'index']);
+});
 // Protected routes with JWT middleware
 Route::middleware('auth.jwt')->group(function () {
     Route::get('me',  [AuthController::class, 'me']);
@@ -83,6 +86,8 @@ Route::middleware('auth.jwt')->group(function () {
 
     // Bookings
     Route::prefix('bookings')->group(function () {
+        Route::get('get-booking-by-month-unit', [BookingController::class, 'getBookingByMonthUnit']);
+        Route::get('get-booking-by-room', [BookingController::class, 'getBookingByRoom']);
         Route::get('/',       [BookingController::class, 'index']);
         Route::post('/',      [BookingController::class, 'store']);
         Route::get('{id}',    [BookingController::class, 'show']);

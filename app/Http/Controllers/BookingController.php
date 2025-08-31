@@ -22,6 +22,8 @@ class BookingController extends Controller
     {
         $limit = request()->input('limit', 10);
         $page  = request()->input('page', 1);
+        // variable bulan di tahun sekian 
+
         $user_id = request()->input('user_id');
         $query = DB::table('bookings as b')
             ->select(
@@ -286,5 +288,53 @@ class BookingController extends Controller
             DB::rollBack();
             return $this->formatResponse(500, 'Internal Server Error', null);
         }
+    }
+
+    // membuat function untuk get data bookiing by month unit terbanyak booking
+    public function getBookingByMonthUnit(Request $request)
+    {
+        $dateInput = $request->input('date', Carbon::now()->format('Y-m-d'));
+        $date = Carbon::parse($dateInput);
+
+        $year  = $date->year;
+        $month = $date->month;
+
+        $bookings = DB::table('work_units')
+            ->select('work_units.name as unit_name', DB::raw('COUNT(bookings.id) as total_bookings'))
+            ->leftJoin('users', 'users.work_unit_id', '=', 'work_units.id')
+            ->leftJoin('bookings', function ($join) use ($year, $month) {
+                $join->on('bookings.user_id', '=', 'users.id')
+                    ->whereYear('bookings.created_at', $year)
+                    ->whereMonth('bookings.created_at', $month);
+            })
+            ->groupBy('work_units.name')
+            ->orderByDesc('total_bookings')
+            ->get();
+
+
+
+        return $this->formatResponse(200, 'Data booking by month unit', $bookings);
+    }
+    // membuat function untuk get data booking by aula yang sering digunakan
+    public function getBookingByRoom(Request $request)
+    {
+        $dateInput = $request->input('date', Carbon::now()->format('Y-m-d'));
+        $date = Carbon::parse($dateInput);
+
+        $year  = $date->year;
+        $month = $date->month;
+
+        $bookings = DB::table('rooms')
+            ->select('rooms.name as room_name', DB::raw('COUNT(bookings.id) as total_bookings'))
+            ->leftJoin('bookings', function ($join) use ($year, $month) {
+                $join->on('bookings.room_id', '=', 'rooms.id')
+                    ->whereYear('bookings.created_at', $year)
+                    ->whereMonth('bookings.created_at', $month);
+            })
+            ->groupBy('rooms.name')
+            ->orderByDesc('total_bookings')
+            ->get();
+
+        return $this->formatResponse(200, 'Data booking by room', $bookings);
     }
 }
