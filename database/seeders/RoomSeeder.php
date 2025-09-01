@@ -30,7 +30,7 @@ class RoomSeeder extends Seeder
             [
                 'name' => 'Aula PSTP',
                 'capacity' => 10,
-                'description' => 'Aula Saibatin adalah ruang serbaguna yang cocok untuk rapat sederhana. Dilengkapi dengan kursi pimpinan serta kursi peserta yang dapat menampung hingga 10 orang. Ruangan ini juga dilengkapi dengan sistem pendingin .',
+                'description' => 'Aula PTSP adalah ruang serbaguna yang cocok untuk rapat sederhana. Dilengkapi dengan kursi pimpinan serta kursi peserta yang dapat menampung hingga 10 orang. Ruangan ini juga dilengkapi dengan sistem pendingin .',
                 'created_by' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),

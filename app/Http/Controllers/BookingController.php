@@ -9,10 +9,13 @@ use Illuminate\Routing\Controller;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use App\Traits\ResponseTrait;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
+
+// Pastikan locale ke Indonesia
+Carbon::setLocale('id');
 
 
 class BookingController extends Controller
@@ -46,6 +49,7 @@ class BookingController extends Controller
             ->leftJoin('users as rejected_users', 'b.rejected_by', '=', 'rejected_users.id')
             ->leftJoin('users as approved_users', 'b.approved_by', '=', 'approved_users.id')
             ->leftJoin('users as cancelled_users', 'b.deleted_by', '=', 'cancelled_users.id')
+            ->where('b.deleted_at', null)
             ->orderBy('b.created_at', 'desc');
 
 
@@ -94,12 +98,12 @@ class BookingController extends Controller
                         });
                 })
                 ->whereNull('deleted_at')
+                ->whereNull('rejected_by')
                 ->first();
             if ($existingBooking) {
                 return $this->formatResponse(409, 'Ruangan sudah terisi pada waktu tersebut', null);
             }
-
-            $booking = DB::table('bookings')->insert([
+            $data = [
                 'user_id'    => Auth::id(),
                 'room_id'    => $request->room_id,
                 'booking_date' => $request->booking_date ?? now()->toDateString(),
@@ -109,7 +113,9 @@ class BookingController extends Controller
                 'status'     => 'pending', // Default status
                 'created_at' => Carbon::now(),
                 'created_by' => Auth::id(),
-            ]);
+            ];
+            $this->sendNotification((object) $data);
+            $booking = DB::table('bookings')->insert($data);
 
             DB::commit();
 
@@ -192,8 +198,6 @@ class BookingController extends Controller
                 'deleted_at' => Carbon::now(),
                 'deleted_by' => Auth::id(),
                 'status' => 'cancelled', // Assuming you want to mark it as cancelled
-                'cancelled_at' => Carbon::now(),
-                'cancelled_by' => Auth::id(),
                 'approved_at' => null,
                 'approved_by' => null,
                 'rejected_at' => null,
@@ -336,5 +340,40 @@ class BookingController extends Controller
             ->get();
 
         return $this->formatResponse(200, 'Data booking by room', $bookings);
+    }
+    private function sendNotification($booking)
+    {
+
+        $roomData = DB::table('rooms')
+            ->select('rooms.name as room_name', 'users.name as pic_name', 'users.phone as pic_phone')
+            ->leftJoin('users', 'rooms.pic_id', '=', 'users.id')
+            ->where('rooms.id', $booking->room_id)
+            ->first();
+
+        $userData = DB::table('users')
+            ->select('users.name as user_name', 'users.phone as user_phone', 'work_units.name as work_unit_name')
+            ->leftJoin('work_units', 'users.work_unit_id', '=', 'work_units.id')
+            ->where('users.id', $booking->user_id)
+            ->first();
+
+
+        $startDateTime = Carbon::parse($booking->booking_date . ' ' . $booking->start_time);
+        $endDateTime   = Carbon::parse($booking->booking_date . ' ' . $booking->end_time);
+
+        $tanggal = $startDateTime->translatedFormat('l, d F Y');
+        $jamMulai = $startDateTime->format('H:i');
+        $jamSelesai = $endDateTime->format('H:i');
+
+        $message = "Halo {$roomData->pic_name}\n, ada booking baru:\n\n\n"
+            . "{$roomData->room_name}\n\n"
+            . "{$tanggal} ({$jamMulai} - {$jamSelesai}) \n\n"
+            . "Untuk : {$booking->purpose}\n\n"
+            . "Pemesan: {$userData->user_name}\n\n"
+            . "Unit : {$userData->work_unit_name}\n\n";
+
+
+        \App\Jobs\SendWhatsappNotificationJob::dispatch($roomData->pic_phone, $message);
+
+        return back()->with('success', 'Booking tersimpan dan WA notif akan dikirim ke PIC.');
     }
 }

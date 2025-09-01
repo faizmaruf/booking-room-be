@@ -22,8 +22,9 @@ Route::post('login',  [AuthController::class, 'login']);
 Route::post('logout', [AuthController::class, 'logout']);
 Route::post('register', [AuthController::class, 'register']); // optional
 
-Route::prefix('rooms')->group(function () {
-    Route::get('/',       [RoomController::class, 'index']);
+Route::prefix('public')->group(function () {
+    Route::get('/rooms',       [RoomController::class, 'index']);
+    Route::get('/bookings',       [BookingController::class, 'index']);
 });
 // Protected routes with JWT middleware
 Route::middleware('auth.jwt')->group(function () {
