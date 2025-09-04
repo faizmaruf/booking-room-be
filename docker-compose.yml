@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+    app:
+        build: .
+        image: image_toefl:0.0.1
+        ports:
+            - "8888:8888"
+        env_file:
+            - .env
+        volumes:
+            - ./:/var/www/html
+            - ./storage:/var/www/html/storage
+            - ./bootstrap/cache:/var/www/html/bootstrap/cache
+            - ./.env:/var/www/html/.env
+        restart: always
+        networks:
+            - default
+            - nginx-proxy-manager_default
+
+networks:
+    nginx-proxy-manager_default:
+        external: true
