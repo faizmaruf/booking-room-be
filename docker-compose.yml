@@ -3,7 +3,7 @@ version: "3.8"
 services:
     app:
         build: .
-        image: image_toefl:0.0.1
+        image: booking_be:0.0.1
         ports:
             - "8888:8888"
         env_file:
