@@ -71,6 +71,9 @@ class BookingController extends Controller
                 'start_time' => 'required',
                 'end_time'   => 'required|after:start_time',
                 'purpose'    => 'nullable|string',
+                'attachment_file_path'    => 'nullable',
+
+
             ], [
 
                 'room_id.required'    => 'Room ID wajib diisi.',
@@ -84,6 +87,37 @@ class BookingController extends Controller
                 $errorMessages = collect($validator->errors()->all())->implode(', ');
                 return $this->formatResponse(422, $errorMessages, null);
             }
+            if ($request->filled('attachment_file_path')) {
+                $pdfData = $request->attachment_file_path;
+
+                // Pastikan base64 valid dan tipe file adalah PDF
+                if (preg_match('/^data:application\/pdf;base64,/', $pdfData)) {
+                    $pdfData = substr($pdfData, strpos($pdfData, ',') + 1);
+                    $pdfData = base64_decode($pdfData);
+
+                    if ($pdfData === false) {
+                        return response()->json(['error' => 'Invalid PDF file'], 400);
+                    }
+
+                    $date = \Carbon\Carbon::now()->format('Y-m-d');
+                    $filename = 'attachment_' . Auth::id() . '_' . uniqid() . '_' . $date   . '.pdf';
+
+                    // Pastikan folder ada
+                    if (!file_exists(storage_path('app/public/attachment_file'))) {
+                        mkdir(storage_path('app/public/attachment_file'), 0777, true);
+                    }
+
+                    // Simpan file
+                    $path = storage_path('app/public/attachment_file/' . $filename);
+                    file_put_contents($path, $pdfData);
+
+                    // Path yang disimpan ke DB
+                    $attachment_file_path = 'attachment_file/' . $filename;
+                } else {
+                    return response()->json(['error' => 'Invalid PDF format'], 400);
+                }
+            }
+
 
             // jika ada booking di hari dan jam dan room id nya sama, tolak
             $existingBooking = DB::table('bookings')
@@ -111,6 +145,7 @@ class BookingController extends Controller
                 'purpose'    => $request->purpose,
                 'end_time'   => $request->end_time,
                 'status'     => 'pending', // Default status
+                'attachment_file_path' => $attachment_file_path ?? null,
                 'created_at' => Carbon::now(),
                 'created_by' => Auth::id(),
             ];
@@ -149,6 +184,8 @@ class BookingController extends Controller
                 'booking_date' => 'required',
                 'start_time' => 'required',
                 'end_time'   => 'required|after:start_time',
+                'attachment_file_path'    => 'nullable',
+                'purpose'    => 'nullable|string',
             ], [
 
                 'room_id.required'    => 'Room ID wajib diisi.',
@@ -161,6 +198,37 @@ class BookingController extends Controller
                 $errorMessages = collect($validator->errors()->all())->implode(', ');
                 return $this->formatResponse(422, $errorMessages, null);
             }
+            if ($request->filled('attachment_file_path')) {
+                $pdfData = $request->attachment_file_path;
+
+                // Pastikan base64 valid dan tipe file adalah PDF
+                if (preg_match('/^data:application\/pdf;base64,/', $pdfData)) {
+                    $pdfData = substr($pdfData, strpos($pdfData, ',') + 1);
+                    $pdfData = base64_decode($pdfData);
+
+                    if ($pdfData === false) {
+                        return response()->json(['error' => 'Invalid PDF file'], 400);
+                    }
+
+                    $date = \Carbon\Carbon::now()->format('Y-m-d');
+                    $filename = 'attachment_' . Auth::id() . '_' . uniqid() . '_' . $date   . '.pdf';
+
+                    // Pastikan folder ada
+                    if (!file_exists(storage_path('app/public/attachment_file'))) {
+                        mkdir(storage_path('app/public/attachment_file'), 0777, true);
+                    }
+
+                    // Simpan file
+                    $path = storage_path('app/public/attachment_file/' . $filename);
+                    file_put_contents($path, $pdfData);
+
+                    // Path yang disimpan ke DB
+                    $attachment_file_path = 'attachment_file/' . $filename;
+                } else {
+                    return response()->json(['error' => 'Invalid PDF format'], 400);
+                }
+            }
+
 
             $booking = DB::table('bookings')->where('id', $id)->update([
                 'user_id'    => Auth::id(),
@@ -169,6 +237,7 @@ class BookingController extends Controller
                 'start_time' => $request->start_time,
                 'end_time'   => $request->end_time,
                 'purpose'    => $request->purpose,
+                'attachment_file_path' => $attachment_file_path ?? null,
                 'status'     => $request->status ?? 'pending',
                 'updated_at' => Carbon::now(),
                 'updated_by' => Auth::id(),
